@@ -1,1 +1,8 @@
-null
+{
+  "chainId": 296,
+  "address": "0x0b8329d55FfA4Fb7c55Cc9e83de1d40cD966B8CB",
+  "deployer": "0xc0FA3b08E27E9497fa88781a3b444d56E2445669",
+  "deploymentTx": "0x5eeeb8fd700bbc15fe538495a804e6048b40024fb83b0c0807738d573cfdd227",
+  "deploymentBlock": "41147455",
+  "runtimeCodeHash": "0xb4d0310fff256c45d063f730cb891205e1df7a269611e199c8616dd6afd30a8e"
+}

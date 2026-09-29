@@ -65,6 +65,48 @@ O fornecedor de teste é uma **identidade recuperável** (`DELIVERPROOF_FORNECED
 
 Cada prova tem um `provaId`; as retomadas mantêm o mesmo id. Só conta o estado **mais recente de cada prova**, entre todos os artefatos de todas as execuções. Snapshots intermediários de uma prova que depois concluiu não bloqueiam; prova realmente aberta bloqueia prova nova. Retomar é informar `retomar=<id da execução>`. É recusado retomar uma prova já concluída ou um estado mais velho que outro da mesma prova.
 
+## Trilha HCS suplementar (`hcs-testnet`)
+
+Roda **depois** da prova dos dois acordos concluída e do `deployment.json` revisado. Usa o publicador do template (a partir de `398a0b3`: `buildCreateTopic`, `buildSubmit`, `verifyHcsTrail`, `hcsPending`, `parseHcsMessage`, `mirrorTopicReader`), mas envia pelo runner deste pacote, porque o `sdkTopicWriter` do template deixa o SDK gerar o id da transação.
+
+O id de uma transação Hedera é `conta@validStart`. Por isso cada envio passa por três passos:
+
+1. **Preparar, sem chave** (`hcs.ts preparar`). Resolve pelo mirror toda intenção aberta dos diários anteriores, decide o que falta e fixa cada intenção nova no diário: ação, texto canônico exato, chave pública esperada e o `transactionId` (validStart = agora - 10 s, validade de 120 s). Só usa o id `0.0.N` público da conta.
+2. **Guardar.** O diário (`hcs-diario.json`) sobe como artefato `hcs-diario-NN` **antes** de transmitir.
+3. **Transmitir, com a chave** (`hcs.ts transmitir`), único passo que recebe `DELIVERPROOF_TESTNET_PRIVATE_KEY`. Confere que a chave do segredo é a chave do diário, monta a transação com o id do diário (`setRegenerateTransactionId(false)`), só envia se faltarem 30 s ou mais de validade, chama `execute` uma vez e grava o desfecho. Não grava bytes assinados. O id é fixo e nunca regenerado, mas isso **não garante uma única chamada de rede**: o SDK pode reenviar a mesma transação a outros nós (até 5 tentativas); a rede deduplica pelo id.
+
+Só o recibo decide `confirmada` ou `falhou` (status da lista fechada do template, sem os ambíguos: `BUSY`, `UNKNOWN`, `RECEIPT_NOT_FOUND`, `DUPLICATE_TRANSACTION`, `TRANSACTION_EXPIRED`, `PLATFORM_NOT_ACTIVE`, `PLATFORM_TRANSACTION_NOT_CREATED`). Qualquer outro desfecho é `desconhecida`, e a preparação seguinte resolve pelo mirror, pelo id:
+
+| No mirror (registros do id, fora `DUPLICATE_TRANSACTION`)                                                 | Situação                          |
+| --------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| Um registro SUCCESS da operação e do tópico do diário                                                     | `confirmada`                      |
+| Um registro de falha reconhecida e não ambígua, da mesma operação (e do mesmo tópico, se informado)       | `falhou`                          |
+| Nenhum registro, lido **depois** de um frescor além da validade + 30 s, duas vezes com 5 s de intervalo    | `expirada`                        |
+| Nenhum registro dentro da janela                                                                          | espera até 6 min; depois **para** |
+| Status desconhecido ou ambíguo, outra operação, outro tópico, dois originais, só duplicatas, frescor que volta atrás | **para** (a intenção fica aberta) |
+
+`expirada` é definitiva: a rede recusa o id depois da validade, e o mesmo id nunca executa duas vezes. Uma mensagem que precisa ir de novo recebe id novo. **Consistência assumida do mirror:** o que tem consenso até o instante que ele já ingeriu aparece nas leituras seguintes. Por isso a leitura vazia só conta se vier depois do frescor que a justifica; uma leitura vazia anterior ao avanço do mirror nunca vira `expirada`, e o frescor nunca pode voltar atrás dentro da execução.
+
+**Um tópico só:** `acao=criar-topico` para se `hcs-topico.json` já existe, se o diário já tem uma criação confirmada, ou se o mirror (em dia, até 60 s atrás) mostra qualquer `CONSENSUSCREATETOPIC` paga pela conta. A criação confirmada imprime o conteúdo de `hcs-topico.json` (`topicId`, `submitKey`, `criacao`), que entra na cópia **só por commit revisado**, como o `deployment.json`.
+
+**Mensagens** (`acao=publicar`): exige `hcs-topico.json` com a mesma chave da conta no mirror, cada acordo `verified` pelo `verifyAgreement` e o tópico `consistent` ou `incomplete` (divergência ou leitura inconclusiva param sem reservar). Mensagem já confirmada por recibo não volta à fila, mesmo com a lista do mirror atrasada. Até 6 por lote e 16 por execução; o resto fica para a execução seguinte. No fim, `concluir` (sem chave) relê a trilha até ficar consistente.
+
+**Diário entre execuções:** cada execução baixa os `hcs-diario-*` das anteriores (`baixar-artefatos.sh`, só leitura), valida o formato exato (campo a mais, na raiz, na origem ou na intenção, faz parar) e junta pelo id. Situação terminal vence aberta; duas terminais diferentes para o mesmo id fazem parar.
+
+**Histórico revisado (`hcs-registro.json`):** a lista de artefatos baixada nunca prova, sozinha, que o histórico está completo. Antes de qualquer reserva, `preparar` e `concluir` cruzam três fontes:
+
+- o inventário independente do ambiente (`listar-execucoes-ambiente.sh testnet`, implantações do GitHub, permissão `deployments: read`);
+- `hcs-registro.json`, revisado e commitado na cópia: toda execução do `hcs-testnet` que entrou no ambiente, com o sha256 de cada diário (saída de `registrar-execucao.mjs --anteriores anteriores-hcs`), ou `perdida` com `revisao` e `encerradaEm`;
+- `operacao-registro.json`: as execuções EVM (deploy e prova) do mesmo ambiente.
+
+Para se: uma execução do ambiente não está em nenhum dos dois registros; uma execução do registro HCS não está no ambiente; um diário registrado sumiu (listagem sem o artefato, ou ZIP sem o arquivo) ou mudou; há pasta baixada de execução não revisada como HCS; o registro não existe. **Primeiro uso** é explícito: `{"versao": 1, "operador": "0.0.N", "execucoes": []}`, com todas as execuções do ambiente já no `operacao-registro.json` (inclusive a última da prova). **Perda revisada:** `perdida` exige o horário em que a execução terminou, e nada novo é reservado até o mirror passar desse horário + validade + 30 s; assim a consulta de criações e a leitura do tópico já mostram tudo o que ela possa ter enviado. Cada disparo novo exige o registro atualizado com a execução anterior, no mesmo commit revisado do `hcs-topico.json` quando houver.
+
+**Ambiente:** o job usa `environment: testnet` e o mesmo grupo de concorrência. Por isso cada execução do `hcs-testnet` também aparece em `listar-execucoes-ambiente.sh`: se depois for preciso outra execução de `deploy-testnet` ou `prova-testnet`, o registro revisado precisa listá-la. Transação nativa não muda o nonce EVM da conta segundo o nosso entendimento, mas isso **não foi conferido na rede**: rode o HCS só depois da prova.
+
+**Ensaio:** `vite-node operacao/ensaios/hcs.ensaio.ts <saída>` na raiz da cópia, com rede e mirror falsos (validade, deduplicação, recibo, atraso do mirror, índice que só avança no frescor), registro revisado simulado e relógio simulado, mais um teste offline do montador real do SDK (id, validade, `regenerate=false`, freeze). Prova a lógica do runner contra essas regras, não a rede real nem o envio pelo SDK.
+
+**Passo a passo (só com autorização; nada disso foi feito):** depois da prova, commit revisado do `operacao-registro.json` com todas as execuções EVM e do `hcs-registro.json` de primeiro uso; `hcs-testnet` com `HCS-TESTNET`, `acao=criar-topico` e o id `0.0.N` da conta; revisão e commit de `hcs-topico.json` e da execução no `hcs-registro.json`; depois `hcs-testnet` com `acao=publicar` e `acordos=1,2`. O titular aprova cada execução no ambiente.
+
 ## Logs
 
 A saída pública é uma linha JSON por evento: hashes, nonces, endereços, CID. Os erros saem **só como código fixo e número** (status HTTP ou código JSON-RPC). Nunca saem mensagem de biblioteca, corpo remoto ou dado assinado. As chaves só existem nos passos "Preparar", e os passos "Transmitir" não as recebem.
@@ -104,3 +146,5 @@ A conferência (`conferir.ts`) usa o mesmo cliente limitado: prazo, limite de by
 ## Não validado
 
 GitHub Actions real, Environment real, Filebase real, porta pública real e a conta oca do fornecedor no Hedera. Isso só se prova na primeira execução autorizada.
+
+Trilha HCS: criação do tópico e envio de mensagens pelo SDK na testnet real, o mirror real respondendo às consultas por id e por conta, e o efeito de transações nativas no nonce EVM da conta.

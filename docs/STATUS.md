@@ -1,6 +1,135 @@
-# Status — 2026-09-28
+# Status — 2026-09-29
 
-## Current documentary acceptance — C-0052
+## Current HCS publisher integration — 2026-09-29
+
+Reviewed original commits 86d4a829b901dfe16d4ddff2a76a9712d63e8780 and
+02dd5182ab21b9398861a419fe9ed825f39b2438 are public. The latter closes the review's
+error-boundary findings: fixed code/status allowlists, guarded reads and rebuilt
+errors/receipts. It adds a core publisher plus a testnet Hiero SDK adapter, with
+canonical contract history still authoritative. No HCS UI or protected operational
+runner is included, and no topic, message or other transaction was sent to Hedera.
+
+Supplied cloud evidence on exact source 02dd518: Node 22.22.2, npm@10.9.7, clean
+install/type/build/format success, core 113 passed+1 skipped, Hardhat 38, chain 46;
+existing lint warning retained. The HCS subset also passed 41/41 in a networkless
+namespace. Offline freeze/sign/serialization tests do not prove SDK transmission
+or network acceptance. Node 20/24 were not repeated for this increment.
+
+Independent public CLI install: [36556660288](https://github.com/rafaorlando3/deliverproof/actions/runs/36556660288),
+workflow 6757cf35dc5d58f368daacfa5847ba7e1bc67c44 on validation/public-install,
+CLI 0.4.1, Node 22.22.2, npm@10.9.7. Main was 02dd518 before and after.
+CLI exit 0; check, core:test (113+1 skipped), hardhat:test (38), next:build and
+chain:test (46) all exit 0. The skipped opt-in live mirror test is not a live
+HCS success; no testnet secret or transaction was used. Lint/format were not
+repeated by the public workflow. The CLI retains its tar@6.2.1 warning.
+
+Artifact SHA256 `d68d1c67dab18ba0982551793604874d8c72180a30f201d44aba73ac55bf9233`,
+20 evidence files; digest checked after download. The 65 generated files were
+compared with 66 source files: template.json omitted, three manifests changed
+only packageManager metadata, lockfile changed, remaining 61 files (including
+eight Markdown files) byte-identical by SHA256. Registry version/integrity
+unchanged before/after. An unauthenticated public source archive also matched
+all 66 reviewed files.
+
+This follow-up documentation edit records these results, corrects the README's
+obsolete publisher limitation and marks the operator journal boundary. It changes
+no executable source, configuration, dependency, lockfile or test from 02dd518.
+The new Markdown bytes were reviewed statically, not regenerated through the CLI.
+
+Still pending: own testnet deployment and lifecycle, public IPFS retrieval, live
+HCS proof and final bounty submission. A protected runner and owner approval
+remain required before real testnet operations. No project, installer or test
+was executed on the Mac. Historical sections below retain their exact-source
+acceptance boundaries.
+
+
+## Previous verifier integration — 2026-09-29
+
+Reviewed documentation candidates aaa9c03, bddf04d and f02b96f are integrated.
+The README qualifies the deployment journal as local to a preserved checkout,
+distinguishes unreadable CARs from content mismatches, and explains IPFS retrieval
+without claiming that other transports cannot verify a digest.
+
+The optional HCS verifier from 4eb876f and correction 76b989d is integrated.
+Executable source, configuration, lockfile and tests match
+76b989d610a24d76cf7eec32768cecd6e28b1581 byte for byte. Only documentation differs.
+Contract history remains canonical; HCS is a supplemental comparison, with no
+publisher or UI integration in this increment. Messages beyond the contract
+snapshot yield inconclusive/hcs_after_snapshot; an invented event inside the
+verified range still yields mismatch. Single raw key lengths are validated before
+mirror reads.
+
+Reviewed supplied cloud logs on Node 22.22.2: core 72 passed and 1 skipped,
+Hardhat 38, chain 45; type checks, next build and formatting passed. Lint has the
+existing one React hook warning. The old source fails four targeted unit tests and
+two chain tests; the old-chain command also reports a second filter/no-test exit,
+so the regression claim rests on the displayed assertion failures, not that exit
+code alone. No code or test ran on the owner's Mac. Node 20 and 24 were not rerun
+for this HCS correction.
+
+Fresh public installation of integration `582022e09f191bed702d74afea501dba26412c3d` completed:
+https://github.com/rafaorlando3/deliverproof/actions/runs/36544715934. Workflow commit
+4e04e4d59c5f3fb1295438c8c132a5f385a8584e on validation/public-install, CLI 0.4.1,
+Node 22.22.2 and npm@10.9.7, no secrets or local override. Main remained 582022e
+before and after installation. CLI exit 0; check, core:test (72 passed/1 skipped),
+hardhat:test (38), next:build and chain:test (45) each exited 0. The skipped test is
+the opt-in live mirror check (HCS_LIVE_TOPIC was unset), not an observed live HCS
+success. Lint and formatting were not repeated in this public workflow.
+
+Artifact public-install-evidence-36544715934-1 has SHA256
+`a6615b2e50837e85ab618edba6bf21457ac056dc31d182e763b7273b0fbe9bea`. Its 20 files were downloaded
+and the digest independently checked. Generated tree: 60 files against 61 source
+files. template.json is omitted; packageManager metadata changes in three
+manifests and package-lock.json differs. Every other file, including all eight
+Markdown documents and HCS source/tests, matches the installed source by SHA256.
+The registry version and integrity were unchanged before/after the run. The CLI
+emitted a tar@6.2.1 deprecation/security notice; success is not a claim of no
+vulnerabilities. No private key or secret was supplied or needed.
+
+The follow-up documentation commit records that result without rerunning suites;
+its executable files, configuration, lockfile and tests remain identical to 582022e.
+The earlier run below covers e43e970 only. Hedera deployment, live HCS use, public
+IPFS retrieval and final bounty submission remain pending. No testnet credentials
+or transactions are used in these reviews.
+
+## Recorded public installation — 2026-09-29
+
+Done and publicly checkable:
+
+- The template source is public at https://github.com/rafaorlando3/deliverproof.
+  Its main branch was `e43e9702c581fb26a776c802a272d5f9b4cd627b` when this note
+  was written; executable source, configuration and lockfile are the ones accepted
+  below.
+- Clean install of that source through the official CLI 0.4.1 on a GitHub-hosted
+  runner: https://github.com/rafaorlando3/deliverproof/actions/runs/36538164582
+  (push of workflow commit `81b4f2f0aeb4c8bef85dfd89ed9a3e46746663b0` on the
+  `validation/public-install` branch, conclusion success). Node 22.22.2 and
+  npm@10.9.7, no secrets, no template override; the public main was
+  `e43e970` before and after the install. The install and the `check`,
+  `core:test` (53), `hardhat:test` (38), `next:build` and `chain:test` (43)
+  scripts exited 0. The run artifact `public-install-evidence-36538164582-1`
+  has sha256 `847852e9bf290180efe9337904cf56a04e10dd9be25928e3ad10f0a247ebafd2`.
+  The workflow file was not merged into main. This run covers source `e43e970`
+  only: later commits, including documentation commits, do not inherit it, and it
+  is not a Hedera, IPFS or submission proof.
+
+Confirmed:
+
+- The bounty registration form was submitted and the organizer's automatic
+  confirmation email was received. That is a registration, not a final submission.
+
+Still pending, with nothing claimed:
+
+- Our own Hedera testnet deployment and agreement lifecycle, with HashScan and
+  mirror links.
+- Public IPFS retrieval of a delivery file.
+- The final bounty submission.
+
+The README and this note separate the public source, the recorded public install
+of `e43e970` and the pending Hedera, IPFS and submission evidence. These are
+documentation-only changes: no behavioral suite was repeated for them.
+
+## Previous documentary acceptance — C-0052
 
 The three-line correction in 77927108893bc7049254749e162f914d8625eb98
 is integrated over efcdaf5. Only README.md and docs/INSTALL.md change in
@@ -306,12 +435,16 @@ pending. No competition submission or public deployment has been made.
 1. Actual Hedera testnet and public IPFS path after applicable direct account,
    faucet, pinning and deployment authorization. Verify our deployment receipt,
    deposit/credit/withdraw/refund, tinybar/weibar conversion and custom errors.
-2. Clean external-template installation from an authorized public repository;
-   do not substitute the recorded local-template generation for public delivery.
+2. Done for source `e43e970` on 2026-09-29: clean external-template installation
+   from the public repository (https://github.com/rafaorlando3/deliverproof/actions/runs/36538164582). A future executable change needs its own
+   recorded install; the local-template generation is still not a substitute.
 3. Competition eligibility, fresh competitor check, video and submission authorization.
 
-No public repo, deployment, paid service, production money or competition submission.
-Current executable source, configuration and lockfile match tested 15c65ba.
+Historical note, before 2026-09-29: there was no public repo then. The current
+state is at the top of this file. Still true today: no deployment, paid service,
+production money or competition submission.
+At that historical checkpoint, executable source, configuration and lockfile
+matched tested 15c65ba. The current HCS increment is recorded at the top.
 The Node 20 correction changes test location and runtime metadata only; the
 previously accepted UI-01/02/03 and lifecycle evidence remains at its recorded
 boundary. Real Hedera/IPFS and competition readiness remain unverified.

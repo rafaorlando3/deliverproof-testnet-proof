@@ -66,7 +66,7 @@ export type NetworkResult =
       agreement: Agreement;
       snapshot: ChainBlock;
       delivery: Delivery | null;
-      milestones: { event: string; hash: Hex; block: bigint }[];
+      milestones: { event: string; hash: Hex; block: bigint; logIndex: number }[];
     }
   | { status: 'mismatch' | 'inconclusive'; code: string };
 class EvidenceError extends Error {
@@ -339,7 +339,12 @@ export async function verifyAgreement(t: TrustedDeployment, id: bigint, reader: 
       agreement: a,
       snapshot,
       delivery,
-      milestones: events.map(x => ({ event: x.name, hash: x.log.transactionHash, block: x.log.blockNumber })),
+      milestones: events.map(x => ({
+        event: x.name,
+        hash: x.log.transactionHash,
+        block: x.log.blockNumber,
+        logIndex: x.log.logIndex,
+      })),
     };
   } catch (e) {
     if (e instanceof EvidenceError) return { status: e.status, code: e.code };

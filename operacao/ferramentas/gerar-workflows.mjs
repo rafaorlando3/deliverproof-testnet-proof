@@ -1,4 +1,4 @@
-// Gera workflows/deploy-testnet.yml e workflows/prova-testnet.yml. `--conferir` falha se os arquivos diferem.
+// Gera workflows/deploy-testnet.yml, workflows/prova-testnet.yml e workflows/hcs-testnet.yml. `--conferir` falha se os arquivos diferem.
 // Ações fixadas por SHA completo, conferido com `git ls-remote` nos repositórios oficiais em 2026-09-28:
 //   actions/checkout        refs/tags/v7.0.1 -> 3d3c42e5aac5ba805825da76410c181273ba90b1
 //   actions/setup-node      refs/tags/v7.0.0 -> 820762786026740c76f36085b0efc47a31fe5020
@@ -206,8 +206,94 @@ ${chaves}        run: node operacao/prova.mjs preparar --estado saida/prova-esta
           retention-days: 90
 `;
 
+const LOTES_HCS = 3; // até 6 intenções por lote; 16 mensagens por execução no máximo
+const preparaHcs =
+  n => `      - name: Preparar HCS ${n} (sem chave; resolve pelo mirror e fixa as intenções com o id da transação)
+        env:
+          ACAO: \${{ inputs.acao }}
+          OPERADOR: \${{ inputs.operador }}
+          ACORDOS: \${{ inputs.acordos }}
+        run: node_modules/.bin/vite-node operacao/hcs.ts preparar --diario saida/hcs-diario.json --anteriores anteriores-hcs --execucoes-ambiente execucoes-ambiente.json --acao "$ACAO" --operador "$OPERADOR" --acordos "$ACORDOS"
+      - name: Guardar o diário ${n} antes de transmitir
+        uses: ${UPLOAD}
+        with:
+          name: hcs-diario-${n}
+          path: saida/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Transmitir HCS ${n} (único passo com a chave; id do diário, sem reenvio)
+        env:
+          DELIVERPROOF_TESTNET_AUTHORIZED: 'yes'
+          DELIVERPROOF_TESTNET_PRIVATE_KEY: \${{ secrets.DELIVERPROOF_TESTNET_PRIVATE_KEY }}
+          OPERADOR: \${{ inputs.operador }}
+        run: node_modules/.bin/vite-node operacao/hcs.ts transmitir --diario saida/hcs-diario.json --operador "$OPERADOR"
+`;
+const passosHcs = Array.from({ length: LOTES_HCS }, (_, i) => preparaHcs(String(i + 1).padStart(2, '0'))).join('');
+
+const hcs = `# Gerado por operacao/ferramentas/gerar-workflows.mjs. Não editar à mão.
+# Trilha HCS suplementar. Só depois da prova dos dois acordos concluída e do deployment.json revisado.
+# 0) Antes de cada disparo: hcs-registro.json e operacao-registro.json revisados cobrem TODA execução anterior do ambiente.
+# 1) acao=criar-topico: cria o tópico (submit key da conta, sem admin key); registre hcs-topico.json por commit revisado.
+# 2) acao=publicar: publica as mensagens canônicas que faltam. Cada lote: preparar (sem chave) -> guardar -> transmitir.
+name: hcs-testnet
+on:
+  workflow_dispatch:
+    inputs:
+      confirmar:
+        description: Digite HCS-TESTNET
+        required: true
+      acao:
+        description: criar-topico ou publicar
+        required: true
+      operador:
+        description: Id Hedera 0.0.N da conta da DELIVERPROOF_TESTNET_PRIVATE_KEY (público)
+        required: true
+      acordos:
+        description: Ids dos acordos da prova, separados por vírgula
+        required: false
+        default: '1,2'
+permissions:
+  contents: read
+  actions: read
+  deployments: read
+concurrency:
+  group: deliverproof-testnet
+  cancel-in-progress: false
+jobs:
+  hcs:
+    if: inputs.confirmar == 'HCS-TESTNET' && (inputs.acao == 'criar-topico' || inputs.acao == 'publicar')
+    runs-on: ubuntu-24.04
+    environment: testnet
+    timeout-minutes: 45
+    env:
+      DELIVERPROOF_REDE: testnet
+${comum}      - name: Baixar os diários HCS de execuções anteriores (só leitura)
+        env:
+          GH_TOKEN: \${{ github.token }}
+        run: |
+          mkdir -p saida
+          bash operacao/baixar-artefatos.sh hcs-diario- anteriores-hcs
+      - name: Listar as execuções que entraram no ambiente (inventário independente dos artefatos, só leitura)
+        env:
+          GH_TOKEN: \${{ github.token }}
+        run: bash operacao/listar-execucoes-ambiente.sh testnet execucoes-ambiente.json
+${passosHcs}      - name: Concluir (sem chave; resolve as abertas e relê a trilha no mirror)
+        env:
+          OPERADOR: \${{ inputs.operador }}
+          ACORDOS: \${{ inputs.acordos }}
+        run: node_modules/.bin/vite-node operacao/hcs.ts concluir --diario saida/hcs-diario.json --anteriores anteriores-hcs --execucoes-ambiente execucoes-ambiente.json --operador "$OPERADOR" --acordos "$ACORDOS"
+      - name: Guardar o diário final
+        if: always()
+        uses: ${UPLOAD}
+        with:
+          name: hcs-diario-99
+          path: saida/
+          if-no-files-found: ignore
+          retention-days: 90
+`;
+
 const pasta = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../workflows');
-const saidas = { 'deploy-testnet.yml': deploy, 'prova-testnet.yml': prova };
+const saidas = { 'deploy-testnet.yml': deploy, 'prova-testnet.yml': prova, 'hcs-testnet.yml': hcs };
 let diferente = false;
 for (const [n, t] of Object.entries(saidas)) {
   const f = path.join(pasta, n);

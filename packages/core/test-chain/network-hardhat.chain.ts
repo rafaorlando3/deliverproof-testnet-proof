@@ -22,6 +22,9 @@ import { hardhat } from 'viem/chains';
 import { CID } from 'multiformats/cid';
 import { sha256 } from 'multiformats/hashes/sha2';
 import { deliverProofAbi } from '../src/abi.js';
+import { crossCheckHcs, hcsMessage, type TopicInfo, type TopicMessage } from '../src/hcs.js';
+import { publishHcsTrail } from '../src/hcs-publish.js';
+import { fakeHcs } from '../test/fake-hcs.js';
 import {
   verifyAgreement,
   type ChainLog,
@@ -802,3 +805,164 @@ function helpers() {
     return { wallet: await dep('ForwardingWallet', buyer), mimic: await dep('EventMimic', stranger) };
   })());
 }
+
+describe('trilha HCS suplementar sobre eventos reais do nó', () => {
+  it('uma mensagem por evento verificado; Approved e CreditAvailable dividem a transação com logIndex diferente', async () => {
+    const t = await deploy();
+    const a = await create(t);
+    await call(t, buyer, 'fund', [a.id], a.amount);
+    await submit(t, a.id);
+    await call(t, buyer, 'approve', [a.id, await commitmentOf(t, a.id)]);
+    const r = await verifyAgreement(t, a.id, reader());
+    expect(r.status).toBe('verified');
+    if (r.status !== 'verified') return;
+    const approved = r.milestones.find(m => m.event === 'Approved')!;
+    const credit = r.milestones.find(m => m.event === 'CreditAvailable')!;
+    expect(approved.hash).toBe(credit.hash);
+    expect(approved.logIndex).not.toBe(credit.logIndex);
+
+    const key = { type: 'ED25519' as const, key: '11'.repeat(32) };
+    const topic: TopicInfo = { topicId: '0.0.9001', deleted: false, submitKey: key };
+    const posted: TopicMessage[] = r.milestones.map((m, i) => ({
+      topicId: '0.0.9001',
+      sequence: i + 1,
+      consensusTimestamp: `17906650${i}0.000000001`,
+      bytes: new TextEncoder().encode(hcsMessage(t, a.id, m)),
+      chunkTotal: 1,
+    }));
+    const trusted = { topicId: '0.0.9001', submitKey: key };
+    expect(crossCheckHcs(t, a.id, r, trusted, topic, posted)).toMatchObject({ status: 'consistent', duplicates: 0 });
+    expect(crossCheckHcs(t, a.id, r, trusted, topic, posted.slice(0, 3))).toMatchObject({ status: 'incomplete' });
+
+    // Um evento do mesmo contrato mas de outro acordo é ignorado, não confundido.
+    const b = await create(t);
+    const other = await verifyAgreement(t, b.id, reader());
+    expect(other.status).toBe('verified');
+    if (other.status !== 'verified') return;
+    const foreign: TopicMessage = {
+      ...posted[0]!,
+      sequence: 99,
+      bytes: new TextEncoder().encode(hcsMessage(t, b.id, other.milestones[0]!)),
+    };
+    expect(crossCheckHcs(t, a.id, r, trusted, topic, [...posted, foreign])).toMatchObject({
+      status: 'consistent',
+      ignored: 1,
+    });
+    // A mesma transação real atribuída ao acordo errado. Ela foi minerada depois do snapshot de `r`:
+    // com a leitura antiga, não dá para julgar (inconclusive); relida a história, é divergência.
+    const wrong: TopicMessage = {
+      ...foreign,
+      sequence: 100,
+      bytes: new TextEncoder().encode(hcsMessage(t, a.id, other.milestones[0]!)),
+    };
+    expect(other.milestones[0]!.block).toBeGreaterThan(r.snapshot.number);
+    expect(crossCheckHcs(t, a.id, r, trusted, topic, [...posted, wrong])).toEqual({
+      status: 'inconclusive',
+      code: 'hcs_after_snapshot',
+    });
+    const again = await verifyAgreement(t, a.id, reader());
+    expect(again.status).toBe('verified');
+    if (again.status !== 'verified') return;
+    expect(crossCheckHcs(t, a.id, again, trusted, topic, [...posted, wrong])).toEqual({
+      status: 'mismatch',
+      code: 'hcs_unknown_event',
+    });
+  });
+
+  it('evento legítimo minerado depois do snapshot, com mensagem já no tópico: inconclusive, e consistente ao reler', async () => {
+    const t = await deploy();
+    const a = await create(t);
+    // Leitura canônica no bloco N: só Created.
+    const atN = await verifyAgreement(t, a.id, reader());
+    expect(atN.status).toBe('verified');
+    if (atN.status !== 'verified') return;
+    expect(atN.milestones.map(m => m.event)).toEqual(['Created']);
+
+    // Antes da leitura do HCS, o comprador deposita (N+1) e o publicador posta as duas mensagens.
+    await call(t, buyer, 'fund', [a.id], a.amount);
+    const atN1 = await verifyAgreement(t, a.id, reader());
+    expect(atN1.status).toBe('verified');
+    if (atN1.status !== 'verified') return;
+    const funded = atN1.milestones.find(m => m.event === 'Funded')!;
+    expect(funded.block).toBeGreaterThan(atN.snapshot.number);
+
+    const key = { type: 'ECDSA_SECP256K1' as const, key: '02' + '22'.repeat(32) };
+    const topic: TopicInfo = { topicId: '0.0.9002', deleted: false, submitKey: key };
+    const trusted = { topicId: '0.0.9002', submitKey: key };
+    const posted: TopicMessage[] = atN1.milestones.map((m, i) => ({
+      topicId: '0.0.9002',
+      sequence: i + 1,
+      consensusTimestamp: `17906651${i}0.000000001`,
+      bytes: new TextEncoder().encode(hcsMessage(t, a.id, m)),
+      chunkTotal: 1,
+    }));
+
+    // Antes da correção isto dava mismatch/hcs_unknown_event: falsa divergência.
+    expect(crossCheckHcs(t, a.id, atN, trusted, topic, posted)).toEqual({
+      status: 'inconclusive',
+      code: 'hcs_after_snapshot',
+    });
+    expect(crossCheckHcs(t, a.id, atN1, trusted, topic, posted)).toMatchObject({ status: 'consistent', duplicates: 0 });
+
+    // Um evento inventado dentro do intervalo lido continua divergência, mesmo com a mensagem posterior.
+    const invented: TopicMessage = {
+      ...posted[0]!,
+      sequence: 50,
+      bytes: new TextEncoder().encode(
+        hcsMessage(t, a.id, { event: 'Refunded', hash: keccak256('0x99'), block: atN.snapshot.number, logIndex: 0 }),
+      ),
+    };
+    for (const history of [atN, atN1])
+      expect(crossCheckHcs(t, a.id, history, trusted, topic, [...posted, invented])).toEqual({
+        status: 'mismatch',
+        code: 'hcs_unknown_event',
+      });
+  });
+});
+
+describe('publicador HCS sobre eventos reais do nó (tópico em memória, sem rede Hedera)', () => {
+  it('publica o que falta, confere; depois do saque publica só o evento novo; leitura velha é recusada', async () => {
+    const t = await deploy();
+    const a = await create(t);
+    await call(t, buyer, 'fund', [a.id], a.amount);
+    await submit(t, a.id);
+    await call(t, buyer, 'approve', [a.id, await commitmentOf(t, a.id)]);
+    const before = await verifyAgreement(t, a.id, reader());
+    expect(before.status).toBe('verified');
+    const key = { type: 'ED25519' as const, key: '11'.repeat(32) };
+    const trusted = { topicId: '0.0.9002', submitKey: key };
+    const f = fakeHcs(trusted.topicId, key, 1); // o mirror mostra cada mensagem uma leitura depois
+    const fast = { confirmDelayMs: 0 };
+
+    const first = await publishHcsTrail(t, a.id, before, trusted, f.reader, f.writer, fast);
+    expect(first).toMatchObject({ status: 'published', confirmed: true, check: { status: 'consistent' } });
+    expect(f.submits).toBe(5);
+    if (before.status === 'verified')
+      expect(f.consensus().map(m => new TextDecoder().decode(m.bytes))).toEqual(
+        before.milestones.map(m => hcsMessage(t, a.id, m)),
+      );
+
+    await call(t, supplier, 'withdraw', [a.id]);
+    const after = await verifyAgreement(t, a.id, reader());
+    const second = await publishHcsTrail(t, a.id, after, trusted, f.reader, f.writer, fast);
+    expect(second).toMatchObject({ status: 'published', confirmed: true });
+    if (second.status === 'published') {
+      expect(second.submitted).toHaveLength(1);
+      expect(JSON.parse(second.submitted[0]!.message)).toMatchObject({
+        event: 'Withdrawn',
+        agreementId: a.id.toString(),
+      });
+    }
+    expect(f.submits).toBe(6);
+
+    // A leitura do contrato anterior ao saque não enxerga o Withdrawn que já está no tópico.
+    expect(await publishHcsTrail(t, a.id, before, trusted, f.reader, f.writer, fast)).toEqual({
+      status: 'refused',
+      code: 'hcs_after_snapshot',
+    });
+    expect(await publishHcsTrail(t, a.id, after, trusted, f.reader, f.writer, fast)).toMatchObject({
+      status: 'up_to_date',
+    });
+    expect(f.submits).toBe(6);
+  });
+});

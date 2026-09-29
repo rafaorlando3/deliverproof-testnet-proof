@@ -32,5 +32,10 @@
   },
   "devDependencies": {
     "prettier": "3.9.9"
+  },
+  "overrides": {
+    "@hiero-ledger/sdk": {
+      "ethers": "6.17.0"
+    }
   }
 }

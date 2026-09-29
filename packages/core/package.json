@@ -8,6 +8,9 @@
     "./artifact": "./src/artifact.ts",
     "./content": "./src/content.ts",
     "./delivery": "./src/delivery.ts",
+    "./hcs": "./src/hcs.ts",
+    "./hcs-publish": "./src/hcs-publish.ts",
+    "./hcs-sdk": "./src/hcs-sdk.ts",
     "./network": "./src/network.ts",
     "./log-windows": "./src/log-windows.ts",
     "./read-errors": "./src/read-errors.ts",
@@ -20,6 +23,7 @@
     "typecheck:chain": "tsc --noEmit -p tsconfig.chain.json"
   },
   "dependencies": {
+    "@hiero-ledger/sdk": "2.88.0",
     "@ipld/car": "5.4.7",
     "ipfs-unixfs-exporter": "16.2.3",
     "multiformats": "14.0.5",

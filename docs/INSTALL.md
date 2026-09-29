@@ -1,16 +1,15 @@
 # Installation and operator guide
 
-Source review package, not a published template or public demo. Do not run any of these
-commands on the owner's Mac. Execution belongs in Claude's authorized cloud.
-Installation, build and frontend startup do not transmit public transactions or
-pin files. Authorized contract/chain tests deploy fixtures to an isolated local
-EVM; those fixture deployments are not a public Hedera deployment.
+Public source template, not a live Hedera demo. Installation, build and frontend
+startup do not transmit public transactions or pin files. Contract and chain
+tests deploy fixtures to an isolated local EVM; those fixture deployments are
+not a public Hedera deployment.
 
 ## Reproducible installation gate
 
 The recommended recorded runtime is **Node 22.22.2 with npm@10.9.7**.
 Keep the reviewed lockfile. The accepted correction b55b656 removes a test-only direct
-TypeScript import that failed on Node 20.18.3. Its cloud report uses tested source
+TypeScript import that failed on Node 20.18.3. Its recorded report uses tested source
 15c65ba and CLI 0.4.0 generated projects, with all commands passing on:
 
 | Node | Actual package manager | Dependency-engine warnings |
@@ -26,13 +25,14 @@ and one frontend lint warning remain; “exit 0” does not mean warning-free.
 The manifest declares `>=20.18.3 <21 || >=22.18.0 <23 || >=24.0.0 <25`.
 Do not claim that every later version was validated, for Node or for npm.
 
-Source b55b656 differs from tested 15c65ba only in STATUS.md; later guide edits
-also affect documentation only. See [STATUS](STATUS.md) for acceptance boundaries. Record the SHA, actual runtime and installation mode for a release
+Source b55b656 differs from tested 15c65ba only in STATUS.md; the guide edits
+that followed that battery affected documentation only. HCS was added later and
+validated on Node 22.22.2; the old Node 20/24 results do not cover HCS. See [STATUS](STATUS.md) for acceptance boundaries. Record the SHA, actual runtime and installation mode for a release
 candidate. Do not regenerate the lock merely to hide an installation failure.
 The reported Node-compatibility battery used ordinary `npm ci --no-audit --no-fund`;
 its results must not be described as an `--ignore-scripts` run.
 
-In the authorized cloud, the independent release checks are:
+The independent release checks are:
 
 ```sh
 npm ci --no-audit --no-fund
@@ -53,19 +53,19 @@ uses fail-fast behavior; it is not sufficient evidence if core fails. Run the
 frontend type check again after Next has generated its route declarations.
 `next build` must produce a complete build, not merely a started process.
 
-After an accepted cloud build, `npm run next:start` serves only the loopback
+After a complete build, `npm run next:start` serves only the loopback
 interface on port 3000. Development uses `npm run next:dev`. There are no remote
 fonts, backend secrets or database. The stock deployment JSON is `null` and
 the UI must remain useful as a disabled, clearly labelled source preview.
 
-## Cloud-only local EVM rehearsal
+## Local EVM rehearsal
 
 The contract uses raw tinybar-equivalent accounting units on chain 31337.
 These local values are **not** real Hedera currency behavior. Wallet gas and
 native balance displays use 18 decimals on that EVM; do not infer HBAR payouts.
 The frontend shows agreement amounts divided by 10^8 as HBAR-equivalents.
 
-After the applicable cloud-execution authorization, compile with `npm run hardhat:compile`, start
+Compile with `npm run hardhat:compile`, start
 the loopback node with `npm run hardhat:node`, and explicitly call
 `npm run hardhat:deploy:local`. Keep deterministic development account keys out
 of captured logs; Hardhat prints them at startup, so suppress that startup output.
@@ -80,14 +80,15 @@ expected CREATE address and compiled-code hashes. The public transaction hash is
 appended when available. No key or signed transaction is stored.
 Review `packages/nextjs/lib/deployment.candidate.json`, verify the source/artifact,
 then copy its public contents to `packages/nextjs/lib/deployment.json` in the
-cloud rehearsal checkout. Rebuild/restart the UI after installing the manifest.
-Do not return a cloud-local address as a usable public testnet deployment.
+rehearsal checkout. Rebuild/restart the UI after installing the manifest.
+Never present a local address as a public testnet deployment.
 
-## Testnet deployment — separate authorization gate
+## Testnet deployment
 
-No account, faucet, key, funded transaction or IPFS service has been configured
-by this package. First obtain the owner's authorization for the concrete testnet
-and pinning flow. Stop if a service requests payment or a card. Never use mainnet.
+This package configures no account, faucet, key, funded transaction or IPFS
+service. Deploying and pinning are explicit actions you take with your own test
+account and pinning service. Stop if a service requests payment or a card.
+Never use mainnet.
 
 The explicit script `npm run hardhat:deploy:testnet` accepts only chain **296**
 at the fixed public `https://testnet.hashio.io/api` endpoint. It requires
@@ -96,7 +97,7 @@ the runner's protected process environment. Do not place the key in command
 arguments, shell history, dotenv, a repository, chat, screenshots or logs.
 The script never reads dotenv and intentionally suppresses raw library errors.
 No key is passed to or embedded in the frontend. Clear the runner environment
-afterward. The owner reviews and installs the resulting public candidate manifest.
+afterward. Review the resulting public candidate manifest before installing it.
 
 A submitted hash is not a completed deployment. An interrupted/failed wait must
 be investigated using its durable public attempt journal, account/nonce and hash.
@@ -109,15 +110,15 @@ pass cannot close this gate. Gateway/RPC availability and historical block reads
 must be checked on the real selected provider; the verifier fails inconclusively
 when history is incomplete or unavailable.
 
-## Recovery after a lost deployment response (cloud only)
+## Recovery after a lost deployment response
 
 Preserve the public journal in the same checkout along with its compiled artifact.
 These commands perform only RPC reads and write a candidate after validation:
 
 ```sh
-# From packages/hardhat, for the isolated cloud-local rehearsal:
+# From packages/hardhat, for the isolated local rehearsal:
 node scripts/deploy.cjs --recover-local
-# For a previously authorized testnet deployment, using its public journal:
+# For an earlier testnet deployment, using its public journal:
 node scripts/deploy.cjs --recover-testnet
 ```
 
@@ -140,7 +141,7 @@ This is a **single-checkout** guard, not a distributed deployment coordinator. K
 the journal outside disposable build cleanup and preserve it before transferring
 runners; never start another deployment from a fresh checkout while the previous
 attempt is unresolved. Don't run deployment concurrently with another transaction
-from the same account. In the ephemeral cloud test only, reset the entire isolated
+from the same account. In disposable local tests only, reset the entire isolated
 chain/checkout between unrelated fixtures. Real testnet recovery, address-format
 behavior and persistent-runner storage are still acceptance gates, not proven here.
 
@@ -152,7 +153,7 @@ behavior and persistent-runner storage are still acceptance gates, not proven he
    shared terms and check the hash. Buyer explicitly deposits the exact amount.
 3. Supplier selects **one public synthetic file** (1 byte to 1 MiB) and its declared
    media type. Preparation creates a raw CIDv1 CAR locally. It uploads nothing.
-4. Download that CAR. Pin it using a separately authorized IPFS tool. Generic file
+4. Download that CAR. Pin it with an IPFS service that supports CAR import. Generic file
    upload to a pinning provider may re-encode it as UnixFS and change the CID;
    use CAR import preserving the root. Then retrieve and verify the exact CID.
 5. Supplier records the delivery only after its retrieved bytes verify. Buyer
@@ -177,16 +178,44 @@ it cannot change the trusted deployment and is not proof of future availability.
 
 `template.json` declares Next.js, Hardhat, the `npm` package manager and the custom core workspace.
 The official CLI's local template override (`CREATE_SCAFFOLD_HBAR_TEMPLATE_DIR`)
-can exercise copy/normalization in the cloud before a public repository exists.
+can exercise copy/normalization before a public repository exists.
 Record CLI version/commit and exact command, inspect generated package scripts,
 then repeat the clean locked build in the generated directory. Do not assume
 direct checkout success proves the scaffold transformation worked.
 
-The eventual public install uses `npx create-scaffold-hbar@<verified-version>`
-with the official external repository option, frontend Next.js, Hardhat, npm,
-**testnet**, and no automatic skills installation. The exact public command and
-repository remain pending publication authorization and a real clean install;
-there is intentionally no invented working repository URL here.
+The public install uses `npx create-scaffold-hbar@latest --template
+rafaorlando3/deliverproof` with frontend Next.js, Hardhat, npm, **testnet**, and no
+automatic skills installation. A clean install of source `e43e970` with CLI 0.4.1
+on a GitHub-hosted runner, without the local override, is recorded in
+https://github.com/rafaorlando3/deliverproof/actions/runs/36538164582. It covers that source only.
+
+The newer HCS integration `582022e09f191bed702d74afea501dba26412c3d` was independently
+installed with public CLI 0.4.1 in [run 36544715934](https://github.com/rafaorlando3/deliverproof/actions/runs/36544715934),
+with the same runtime and no override. The five documented workflow commands
+passed: check, core:test (72 passed/1 skipped), hardhat:test (38), next:build and
+chain:test (45). All eight Markdown documents matched the source. The CLI omitted
+template.json, changed packageManager to npm@10.0.0 in three manifests and changed
+package-lock.json; the actual runtime remained npm@10.9.7. The other 56 source
+files matched by SHA256. This is installation evidence, not a testnet or IPFS proof.
+
+
+The HCS publisher and sanitization delta `02dd5182ab21b9398861a419fe9ed825f39b2438` were then
+installed through the same public CLI in [run 36556660288](https://github.com/rafaorlando3/deliverproof/actions/runs/36556660288).
+Node 22.22.2 and npm@10.9.7; no secrets, override, IPFS upload or public transaction.
+Install, check, core:test (113 passed/1 live-mirror test skipped), hardhat:test (38),
+next:build and chain:test (46) passed. The template main stayed at 02dd518 before
+and after installation. Artifact SHA256 `d68d1c67dab18ba0982551793604874d8c72180a30f201d44aba73ac55bf9233`
+was checked after download. The generated tree has 65 files versus 66 in the
+template: template.json omitted, three manifest metadata changes and a different
+lockfile. All other 61 files, including the eight Markdown documents present in
+02dd518, match by SHA256. The documentation recording this result was added later
+and was not regenerated through the CLI. Lint/format were not repeated in the
+public workflow. A CLI tar@6.2.1 deprecation/security warning remains.
+
+HCS is opt-in library code: constructing an adapter is not a live proof, and this
+template provides no protected operational HCS runner or UI integration. Keep
+transaction-attempt journals outside the library across runner interruptions; an
+unknown result requires reconciliation, not an automatic retry.
 
 
 ### Observed CLI 0.4.0 differences

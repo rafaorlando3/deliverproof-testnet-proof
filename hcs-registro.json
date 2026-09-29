@@ -10,6 +10,15 @@
         "hcs-diario-03/hcs-diario.json": "c0857a48b206b15f2eff1b65a90c190e22dd0d6be8687102a9ce44906b70a736",
         "hcs-diario-99/hcs-diario.json": "52de155694166207c34a526a35b4d40becfd01a407ee63894be7ab98384d3595"
       }
+    },
+    {
+      "id": "36640306565",
+      "artefatos": {
+        "hcs-diario-01/hcs-diario.json": "5e4ef9e52e972331c8ff3633b3ca5468b89c555fc0ea82c4a7014b0f192525d8",
+        "hcs-diario-02/hcs-diario.json": "1a837296fd9edfb16b306fa57a1327422aca344ef1e6fb4d097627418aa93340",
+        "hcs-diario-03/hcs-diario.json": "0fbc3fa6a7372b25a5f89f232a9a588b94f501cbcea5606df938a5cdf77bb354",
+        "hcs-diario-99/hcs-diario.json": "aa45a308bd18a7eb0fc1d61a62a42a94eaa4a7cb3ce7ccf37fdd2f12f41945b8"
+      }
     }
   ]
 }

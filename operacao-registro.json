@@ -1,0 +1,19 @@
+{
+  "versao": 2,
+  "contas": {
+    "comprador": "0xc0fa3b08e27e9497fa88781a3b444d56e2445669",
+    "fornecedor": "0x2eabe5195f2690738778a94a722869e899acbf09"
+  },
+  "nonceRevisado": {
+    "0xc0fa3b08e27e9497fa88781a3b444d56e2445669": 0,
+    "0x2eabe5195f2690738778a94a722869e899acbf09": 0
+  },
+  "execucoes": [],
+  "autorizacao": {
+    "id": "aut-1",
+    "nonces": {
+      "0xc0fa3b08e27e9497fa88781a3b444d56e2445669": 0,
+      "0x2eabe5195f2690738778a94a722869e899acbf09": 0
+    }
+  }
+}

@@ -1,5 +1,15 @@
 {
   "versao": 1,
   "operador": "0.0.10776776",
-  "execucoes": []
+  "execucoes": [
+    {
+      "id": "36638080877",
+      "artefatos": {
+        "hcs-diario-01/hcs-diario.json": "ca3294096bdc4768a688a8bdbde0dca6becc67982fcae46c24a04913dbc9b606",
+        "hcs-diario-02/hcs-diario.json": "611f04a2e49cd92ab19f47bc7fd911823705c1dfd94a96e9399fa0b7618027d7",
+        "hcs-diario-03/hcs-diario.json": "c0857a48b206b15f2eff1b65a90c190e22dd0d6be8687102a9ce44906b70a736",
+        "hcs-diario-99/hcs-diario.json": "52de155694166207c34a526a35b4d40becfd01a407ee63894be7ab98384d3595"
+      }
+    }
+  ]
 }

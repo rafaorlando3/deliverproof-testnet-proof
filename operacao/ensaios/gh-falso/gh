@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# gh falso para os ensaios (sem rede): artefatos de $FAKE_GH/lista.json e zips $FAKE_GH/<id>.zip;
+# implantações de $FAKE_GH/deployments.json e status de $FAKE_GH/statuses-<id>.json, sempre com o --jq pedido.
+# $FAKE_GH_FALHA injeta código de saída diferente de zero de verdade:
+#   implantacoes-sem-saida | implantacoes-parcial | status | artefatos-parcial | zip
+echo "$*" >> "$FAKE_GH/chamadas.log"
+jqf=""; prev=""
+for a in "$@"; do [ "$prev" = "--jq" ] && jqf="$a"; prev="$a"; done
+falha="${FAKE_GH_FALHA:-}"
+if [[ "$*" =~ actions/artifacts/([0-9]+)/zip ]]; then
+  [ "$falha" = zip ] && { echo "HTTP 500 corpo remoto" >&2; exit 1; }
+  cat "$FAKE_GH/${BASH_REMATCH[1]}.zip"; exit 0
+fi
+if [[ "$*" =~ deployments/([0-9]+)/statuses ]]; then
+  [ "$falha" = status ] && { echo "HTTP 403 corpo remoto" >&2; exit 1; }
+  jq -r "$jqf" "$FAKE_GH/statuses-${BASH_REMATCH[1]}.json"; exit 0
+fi
+if [[ "$*" =~ /deployments ]]; then
+  [ "$falha" = implantacoes-sem-saida ] && { echo "HTTP 403 corpo remoto" >&2; exit 1; }
+  if [ "$falha" = implantacoes-parcial ]; then jq -r "$jqf" "$FAKE_GH/deployments.json" | head -1; echo "HTTP 502 na página 2" >&2; exit 1; fi
+  jq -r "$jqf" "$FAKE_GH/deployments.json"; exit 0
+fi
+if [ -n "$jqf" ]; then
+  if [ "$falha" = artefatos-parcial ]; then jq -r "$jqf" "$FAKE_GH/lista.json" | head -1; echo "HTTP 502 na página 2" >&2; exit 1; fi
+  jq -r "$jqf" "$FAKE_GH/lista.json"; exit 0
+fi
+exit 9

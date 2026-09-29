@@ -1,0 +1,35 @@
+{
+  "name": "@deliverproof/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./abi": "./src/abi.ts",
+    "./artifact": "./src/artifact.ts",
+    "./content": "./src/content.ts",
+    "./delivery": "./src/delivery.ts",
+    "./network": "./src/network.ts",
+    "./log-windows": "./src/log-windows.ts",
+    "./read-errors": "./src/read-errors.ts",
+    "./receipt": "./src/receipt.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "test:chain": "vitest run --config vitest.chain.config.ts",
+    "typecheck:chain": "tsc --noEmit -p tsconfig.chain.json"
+  },
+  "dependencies": {
+    "@ipld/car": "5.4.7",
+    "ipfs-unixfs-exporter": "16.2.3",
+    "multiformats": "14.0.5",
+    "viem": "2.56.9"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.4",
+    "typescript": "5.9.3",
+    "vitest": "3.2.7",
+    "blockstore-core": "7.0.1",
+    "ipfs-unixfs-importer": "17.1.1"
+  }
+}

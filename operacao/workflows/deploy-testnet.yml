@@ -1,0 +1,95 @@
+# Gerado por operacao/ferramentas/gerar-workflows.mjs. Não editar à mão.
+# Implantação na testnet com reserva pública ANTES da transmissão. A chave só existe no passo "Preparar".
+name: deploy-testnet
+on:
+  workflow_dispatch:
+    inputs:
+      confirmar:
+        description: Digite DEPLOY-TESTNET
+        required: true
+      nonce_esperado:
+        description: Nonce atual da conta que implanta (conta nova = 0)
+        required: true
+      autorizacao:
+        description: Id da autorização vigente no operacao-registro.json revisado
+        required: true
+      substituidas:
+        description: Só depois de conferir a conta e o nonce. Pares reserva=transação que usou aquele nonce (0x..=0x..)
+        required: false
+        default: ''
+permissions:
+  contents: read
+  actions: read
+  deployments: read
+concurrency:
+  group: deliverproof-testnet
+  cancel-in-progress: false
+jobs:
+  implantar:
+    if: inputs.confirmar == 'DEPLOY-TESTNET'
+    runs-on: ubuntu-24.04
+    environment: testnet
+    timeout-minutes: 30
+    env:
+      DELIVERPROOF_REDE: testnet
+    steps:
+      - name: Recusar re-execução (use um novo disparo, com registro revisto e autorização nova)
+        run: |
+          if [ "$GITHUB_RUN_ATTEMPT" != "1" ]; then
+            echo '{"etapa":"erro","codigo":"reexecucao_proibida_use_novo_disparo"}'
+            exit 1
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.22.2
+          package-manager-cache: false
+      - run: npm ci --ignore-scripts
+      - run: npm run hardhat:compile
+      - name: Conferir a origem da cópia de prova
+        run: node -e 'const o=require("./ORIGEM-PROVA.json"); if(!/^[0-9a-f]{40}$/.test(o.template)||!/^[0-9a-f]{40}$/.test(o.operacao)) process.exit(1); console.log(JSON.stringify(o))'
+      - name: Baixar reservas e estados de execuções anteriores (só leitura)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          bash operacao/baixar-artefatos.sh reserva-implantacao anteriores
+          bash operacao/baixar-artefatos.sh prova-estado- anteriores
+      - name: Listar as execuções que já entraram no ambiente (só leitura)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash operacao/listar-execucoes-ambiente.sh testnet execucoes-ambiente.json
+      - name: Conferir o registro revisado contra artefatos, ambiente e rede (só leitura)
+        env:
+          AUTORIZACAO: ${{ inputs.autorizacao }}
+        run: node operacao/conferir-registro.mjs --registro operacao-registro.json --anteriores anteriores --autorizacao "$AUTORIZACAO" --execucoes-ambiente execucoes-ambiente.json
+      - name: Preparar (reconcilia, confere o nonce, assina; não transmite)
+        env:
+          DELIVERPROOF_TESTNET_AUTHORIZED: 'yes'
+          DELIVERPROOF_TESTNET_PRIVATE_KEY: ${{ secrets.DELIVERPROOF_TESTNET_PRIVATE_KEY }}
+          NONCE_ESPERADO: ${{ inputs.nonce_esperado }}
+          SUBSTITUIDAS: ${{ inputs.substituidas }}
+          AUTORIZACAO: ${{ inputs.autorizacao }}
+        run: |
+          mkdir -p saida
+          node operacao/implantar.mjs preparar --nonce "$NONCE_ESPERADO" --reservas anteriores --substituidas "$SUBSTITUIDAS" --registro operacao-registro.json --autorizacao "$AUTORIZACAO" --saida saida/reserva-implantacao.json
+      - name: Guardar a reserva antes de transmitir
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: reserva-implantacao
+          path: saida/reserva-implantacao.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Transmitir a transação reservada (sem chave)
+        env:
+          DELIVERPROOF_TESTNET_AUTHORIZED: 'yes'
+        run: node operacao/implantar.mjs transmitir --reserva saida/reserva-implantacao.json
+      - name: Guardar o candidato
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: candidato-implantacao
+          path: packages/nextjs/lib/deployment.candidate.json
+          if-no-files-found: ignore
+          retention-days: 90

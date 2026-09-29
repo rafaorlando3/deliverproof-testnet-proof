@@ -1,0 +1,37 @@
+{
+  "name": "deliverproof",
+  "version": "0.1.0",
+  "description": "A testnet escrow with explicit approval and independent delivery verification.",
+  "create-scaffold-hbar": {
+    "capabilities": {
+      "frontend": ["nextjs-app"],
+      "solidityFramework": ["hardhat"],
+      "packageManager": ["npm"]
+    },
+    "defaults": {
+      "frontend": "nextjs-app",
+      "solidityFramework": "hardhat",
+      "packageManager": "npm"
+    },
+    "requirements": { "node": ">=20.18.3 <21 || >=22.18.0 <23 || >=24.0.0 <25" },
+    "outro": {
+      "sections": [
+        {
+          "title": "Start with the verified scope",
+          "steps": [
+            {
+              "text": "Read docs/STATUS.md and docs/INSTALL.md. Testnet only. This template never creates a funded account, uploads a file or deploys automatically."
+            },
+            { "label": "Check core types", "command": "{run:check}" },
+            { "label": "Test the core and contract separately", "command": "{run:core:test}" },
+            { "command": "{run:hardhat:test}" },
+            { "label": "Review the frontend", "command": "{run:next:build}" },
+            {
+              "text": "The UI starts without a deployment. Configure only an independently verified manifest before using a wallet. Never target mainnet or put a secret in a file."
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

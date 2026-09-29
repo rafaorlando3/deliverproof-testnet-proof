@@ -1,0 +1,15 @@
+# Formata só código e configuração. Documentos, evidências e gerados ficam como estão.
+node_modules/
+**/node_modules/
+package-lock.json
+*.md
+docs/
+**/artifacts/
+**/cache/
+**/.next/
+packages/nextjs/next-env.d.ts
+packages/nextjs/lib/deployment*.json
+packages/nextjs/lib/deployment.attempt.jsonl
+*.bundle
+*.patch
+*.log

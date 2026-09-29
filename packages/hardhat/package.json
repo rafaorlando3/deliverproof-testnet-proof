@@ -1,0 +1,21 @@
+{
+  "name": "@sh/hardhat",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "node": "hardhat node --hostname 127.0.0.1",
+    "deploy:local": "node scripts/deploy.cjs --local",
+    "deploy:testnet": "node scripts/deploy.cjs --testnet"
+  },
+  "devDependencies": {
+    "hardhat": "2.29.1",
+    "@nomicfoundation/hardhat-ethers": "3.1.3",
+    "@nomicfoundation/hardhat-chai-matchers": "2.1.2",
+    "chai": "4.5.0",
+    "ethers": "6.17.0",
+    "solc": "0.8.28"
+  }
+}

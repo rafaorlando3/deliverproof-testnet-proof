@@ -1,0 +1,33 @@
+import { parseAbi } from 'viem';
+
+/** Same public interface as the original DeliverProof.sol. Cloud acceptance compares ABIs. */
+export const deliverProofAbi = parseAbi([
+  'error UnsupportedChain()',
+  'error InvalidTerms()',
+  'error UnknownAgreement()',
+  'error Unauthorized()',
+  'error WrongState()',
+  'error DeadlinePassed()',
+  'error RefundNotAvailable()',
+  'error WrongAmount()',
+  'error InvalidDelivery()',
+  'error WrongCommitment()',
+  'error AlreadyWithdrawn()',
+  'error TransferFailed()',
+  'error ReentrantCall()',
+  'error DirectPaymentRejected()',
+  'function createAgreement(address supplier, uint64 amountTinybar, uint64 deliveryDeadline, uint64 reviewDeadline, bytes32 termsHash) returns (uint256 id)',
+  'function fund(uint256 id) payable',
+  'function submit(uint256 id, string cid, bytes32 fileSha256, uint64 fileSize, uint8 mediaType)',
+  'function approve(uint256 id, bytes32 expectedCommitment)',
+  'function refund(uint256 id)',
+  'function withdraw(uint256 id)',
+  'function getAgreement(uint256 id) view returns ((address buyer, address supplier, uint64 amountTinybar, uint64 deliveryDeadline, uint64 reviewDeadline, bytes32 termsHash, uint8 state, bytes32 commitment, string cid, bytes32 fileSha256, uint64 fileSize, uint8 mediaType, bool withdrawn))',
+  'event Created(uint256 indexed id, address indexed buyer, address indexed supplier, uint64 amountTinybar, uint64 deliveryDeadline, uint64 reviewDeadline, bytes32 termsHash)',
+  'event Funded(uint256 indexed id, uint64 amountTinybar)',
+  'event Submitted(uint256 indexed id, bytes32 indexed commitment, string cid, bytes32 fileSha256, uint64 fileSize, uint8 mediaType, uint32 version)',
+  'event Approved(uint256 indexed id, bytes32 indexed commitment)',
+  'event Refunded(uint256 indexed id, address indexed initiator)',
+  'event CreditAvailable(uint256 indexed id, address indexed beneficiary, uint64 amountTinybar)',
+  'event Withdrawn(uint256 indexed id, address indexed beneficiary, uint64 amountTinybar)',
+]);

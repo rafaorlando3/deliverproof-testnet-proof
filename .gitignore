@@ -1,0 +1,14 @@
+node_modules/
+.env
+.env.*
+!.env.example
+artifacts/
+cache/
+coverage/
+.next/
+*.tsbuildinfo
+*.log
+*.bundle
+.DS_Store
+packages/nextjs/lib/deployment.candidate.json
+packages/nextjs/lib/deployment.attempt.jsonl

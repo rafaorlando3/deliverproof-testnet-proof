@@ -1,0 +1,291 @@
+# Gerado por operacao/ferramentas/gerar-workflows.mjs. Não editar à mão.
+# Prova com dois acordos. Cada transação: preparar (reserva) -> guardar o estado -> transmitir.
+# Para retomar uma prova parada, informe o id da execução em "retomar".
+name: prova-testnet
+on:
+  workflow_dispatch:
+    inputs:
+      confirmar:
+        description: Digite PROVA-TESTNET
+        required: true
+      autorizacao:
+        description: Id da autorização vigente no operacao-registro.json revisado
+        required: true
+      retomar:
+        description: Id da execução a retomar (vazio = prova nova)
+        required: false
+        default: ''
+      substituidas:
+        description: Só depois de conferir a conta e o nonce. Pares reserva=transação que usou aquele nonce (0x..=0x..)
+        required: false
+        default: ''
+permissions:
+  contents: read
+  actions: read
+  deployments: read
+concurrency:
+  group: deliverproof-testnet
+  cancel-in-progress: false
+jobs:
+  provar:
+    if: inputs.confirmar == 'PROVA-TESTNET'
+    runs-on: ubuntu-24.04
+    environment: testnet
+    timeout-minutes: 60
+    env:
+      DELIVERPROOF_REDE: testnet
+    steps:
+      - name: Recusar re-execução (use um novo disparo, com registro revisto e autorização nova)
+        run: |
+          if [ "$GITHUB_RUN_ATTEMPT" != "1" ]; then
+            echo '{"etapa":"erro","codigo":"reexecucao_proibida_use_novo_disparo"}'
+            exit 1
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.22.2
+          package-manager-cache: false
+      - run: npm ci --ignore-scripts
+      - run: npm run hardhat:compile
+      - name: Conferir a origem da cópia de prova
+        run: node -e 'const o=require("./ORIGEM-PROVA.json"); if(!/^[0-9a-f]{40}$/.test(o.template)||!/^[0-9a-f]{40}$/.test(o.operacao)) process.exit(1); console.log(JSON.stringify(o))'
+      - name: Baixar reservas e estados de execuções anteriores (só leitura)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          bash operacao/baixar-artefatos.sh reserva-implantacao anteriores
+          bash operacao/baixar-artefatos.sh prova-estado- anteriores
+      - name: Listar as execuções que já entraram no ambiente (só leitura)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash operacao/listar-execucoes-ambiente.sh testnet execucoes-ambiente.json
+      - name: Conferir o registro revisado contra artefatos, ambiente e rede (só leitura)
+        env:
+          AUTORIZACAO: ${{ inputs.autorizacao }}
+        run: node operacao/conferir-registro.mjs --registro operacao-registro.json --anteriores anteriores --autorizacao "$AUTORIZACAO" --execucoes-ambiente execucoes-ambiente.json
+      - name: Escolher o estado a retomar
+        env:
+          RETOMAR: ${{ inputs.retomar }}
+        run: |
+          mkdir -p saida
+          node operacao/escolher-estado.mjs --anteriores anteriores --retomar "$RETOMAR" --saida saida/prova-estado.json
+      - name: Preparar 01 (reconcilia, ações sem transação, reserva a próxima)
+        env:
+          DELIVERPROOF_TESTNET_AUTHORIZED: 'yes'
+          DELIVERPROOF_TESTNET_PRIVATE_KEY: ${{ secrets.DELIVERPROOF_TESTNET_PRIVATE_KEY }}
+          DELIVERPROOF_FORNECEDOR_PRIVATE_KEY: ${{ secrets.DELIVERPROOF_FORNECEDOR_PRIVATE_KEY }}
+          FILEBASE_TOKEN: ${{ secrets.FILEBASE_TOKEN }}
+          SUBSTITUIDAS: ${{ inputs.substituidas }}
+          AUTORIZACAO: ${{ inputs.autorizacao }}
+        run: node operacao/prova.mjs preparar --estado saida/prova-estado.json --anteriores anteriores --substituidas "$SUBSTITUIDAS" --registro operacao-registro.json --autorizacao "$AUTORIZACAO"
+      - name: Guardar o estado 01 antes de transmitir
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: prova-estado-01
+          path: saida/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Transmitir 01 (sem chave)
+        env:
+          DELIVERPROOF_TESTNET_AUTHORIZED: 'yes'
+        run: node operacao/prova.mjs transmitir --estado saida/prova-estado.json
+      - name: Preparar 02 (reconcilia, ações sem transação, reserva a próxima)
+        env:
+          DELIVERPROOF_TESTNET_AUTHORIZED: 'yes'
+          DELIVERPROOF_TESTNET_PRIVATE_KEY: ${{ secrets.DELIVERPROOF_TESTNET_PRIVATE_KEY }}
+          DELIVERPROOF_FORNECEDOR_PRIVATE_KEY: ${{ secrets.DELIVERPROOF_FORNECEDOR_PRIVATE_KEY }}
+          FILEBASE_TOKEN: ${{ secrets.FILEBASE_TOKEN }}
+          SUBSTITUIDAS: ${{ inputs.substituidas }}
+          AUTORIZACAO: ${{ inputs.autorizacao }}
+        run: node operacao/prova.mjs preparar --estado saida/prova-estado.json --anteriores anteriores --substituidas "$SUBSTITUIDAS" --registro operacao-registro.json --autorizacao "$AUTORIZACAO"
+      - name: Guardar o estado 02 antes de transmitir
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: prova-estado-02
+          path: saida/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Transmitir 02 (sem chave)
+        env:
+          DELIVERPROOF_TESTNET_AUTHORIZED: 'yes'
+        run: node operacao/prova.mjs transmitir --estado saida/prova-estado.json
+      - name: Preparar 03 (reconcilia, ações sem transação, reserva a próxima)
+        env:
+          DELIVERPROOF_TESTNET_AUTHORIZED: 'yes'
+          DELIVERPROOF_TESTNET_PRIVATE_KEY: ${{ secrets.DELIVERPROOF_TESTNET_PRIVATE_KEY }}
+          DELIVERPROOF_FORNECEDOR_PRIVATE_KEY: ${{ secrets.DELIVERPROOF_FORNECEDOR_PRIVATE_KEY }}
+          FILEBASE_TOKEN: ${{ secrets.FILEBASE_TOKEN }}
+          SUBSTITUIDAS: ${{ inputs.substituidas }}
+          AUTORIZACAO: ${{ inputs.autorizacao }}
+        run: node operacao/prova.mjs preparar --estado saida/prova-estado.json --anteriores anteriores --substituidas "$SUBSTITUIDAS" --registro operacao-registro.json --autorizacao "$AUTORIZACAO"
+      - name: Guardar o estado 03 antes de transmitir
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: prova-estado-03
+          path: saida/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Transmitir 03 (sem chave)
+        env:
+          DELIVERPROOF_TESTNET_AUTHORIZED: 'yes'
+        run: node operacao/prova.mjs transmitir --estado saida/prova-estado.json
+      - name: Preparar 04 (reconcilia, ações sem transação, reserva a próxima)
+        env:
+          DELIVERPROOF_TESTNET_AUTHORIZED: 'yes'
+          DELIVERPROOF_TESTNET_PRIVATE_KEY: ${{ secrets.DELIVERPROOF_TESTNET_PRIVATE_KEY }}
+          DELIVERPROOF_FORNECEDOR_PRIVATE_KEY: ${{ secrets.DELIVERPROOF_FORNECEDOR_PRIVATE_KEY }}
+          FILEBASE_TOKEN: ${{ secrets.FILEBASE_TOKEN }}
+          SUBSTITUIDAS: ${{ inputs.substituidas }}
+          AUTORIZACAO: ${{ inputs.autorizacao }}
+        run: node operacao/prova.mjs preparar --estado saida/prova-estado.json --anteriores anteriores --substituidas "$SUBSTITUIDAS" --registro operacao-registro.json --autorizacao "$AUTORIZACAO"
+      - name: Guardar o estado 04 antes de transmitir
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: prova-estado-04
+          path: saida/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Transmitir 04 (sem chave)
+        env:
+          DELIVERPROOF_TESTNET_AUTHORIZED: 'yes'
+        run: node operacao/prova.mjs transmitir --estado saida/prova-estado.json
+      - name: Preparar 05 (reconcilia, ações sem transação, reserva a próxima)
+        env:
+          DELIVERPROOF_TESTNET_AUTHORIZED: 'yes'
+          DELIVERPROOF_TESTNET_PRIVATE_KEY: ${{ secrets.DELIVERPROOF_TESTNET_PRIVATE_KEY }}
+          DELIVERPROOF_FORNECEDOR_PRIVATE_KEY: ${{ secrets.DELIVERPROOF_FORNECEDOR_PRIVATE_KEY }}
+          FILEBASE_TOKEN: ${{ secrets.FILEBASE_TOKEN }}
+          SUBSTITUIDAS: ${{ inputs.substituidas }}
+          AUTORIZACAO: ${{ inputs.autorizacao }}
+        run: node operacao/prova.mjs preparar --estado saida/prova-estado.json --anteriores anteriores --substituidas "$SUBSTITUIDAS" --registro operacao-registro.json --autorizacao "$AUTORIZACAO"
+      - name: Guardar o estado 05 antes de transmitir
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: prova-estado-05
+          path: saida/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Transmitir 05 (sem chave)
+        env:
+          DELIVERPROOF_TESTNET_AUTHORIZED: 'yes'
+        run: node operacao/prova.mjs transmitir --estado saida/prova-estado.json
+      - name: Preparar 06 (reconcilia, ações sem transação, reserva a próxima)
+        env:
+          DELIVERPROOF_TESTNET_AUTHORIZED: 'yes'
+          DELIVERPROOF_TESTNET_PRIVATE_KEY: ${{ secrets.DELIVERPROOF_TESTNET_PRIVATE_KEY }}
+          DELIVERPROOF_FORNECEDOR_PRIVATE_KEY: ${{ secrets.DELIVERPROOF_FORNECEDOR_PRIVATE_KEY }}
+          FILEBASE_TOKEN: ${{ secrets.FILEBASE_TOKEN }}
+          SUBSTITUIDAS: ${{ inputs.substituidas }}
+          AUTORIZACAO: ${{ inputs.autorizacao }}
+        run: node operacao/prova.mjs preparar --estado saida/prova-estado.json --anteriores anteriores --substituidas "$SUBSTITUIDAS" --registro operacao-registro.json --autorizacao "$AUTORIZACAO"
+      - name: Guardar o estado 06 antes de transmitir
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: prova-estado-06
+          path: saida/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Transmitir 06 (sem chave)
+        env:
+          DELIVERPROOF_TESTNET_AUTHORIZED: 'yes'
+        run: node operacao/prova.mjs transmitir --estado saida/prova-estado.json
+      - name: Preparar 07 (reconcilia, ações sem transação, reserva a próxima)
+        env:
+          DELIVERPROOF_TESTNET_AUTHORIZED: 'yes'
+          DELIVERPROOF_TESTNET_PRIVATE_KEY: ${{ secrets.DELIVERPROOF_TESTNET_PRIVATE_KEY }}
+          DELIVERPROOF_FORNECEDOR_PRIVATE_KEY: ${{ secrets.DELIVERPROOF_FORNECEDOR_PRIVATE_KEY }}
+          FILEBASE_TOKEN: ${{ secrets.FILEBASE_TOKEN }}
+          SUBSTITUIDAS: ${{ inputs.substituidas }}
+          AUTORIZACAO: ${{ inputs.autorizacao }}
+        run: node operacao/prova.mjs preparar --estado saida/prova-estado.json --anteriores anteriores --substituidas "$SUBSTITUIDAS" --registro operacao-registro.json --autorizacao "$AUTORIZACAO"
+      - name: Guardar o estado 07 antes de transmitir
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: prova-estado-07
+          path: saida/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Transmitir 07 (sem chave)
+        env:
+          DELIVERPROOF_TESTNET_AUTHORIZED: 'yes'
+        run: node operacao/prova.mjs transmitir --estado saida/prova-estado.json
+      - name: Preparar 08 (reconcilia, ações sem transação, reserva a próxima)
+        env:
+          DELIVERPROOF_TESTNET_AUTHORIZED: 'yes'
+          DELIVERPROOF_TESTNET_PRIVATE_KEY: ${{ secrets.DELIVERPROOF_TESTNET_PRIVATE_KEY }}
+          DELIVERPROOF_FORNECEDOR_PRIVATE_KEY: ${{ secrets.DELIVERPROOF_FORNECEDOR_PRIVATE_KEY }}
+          FILEBASE_TOKEN: ${{ secrets.FILEBASE_TOKEN }}
+          SUBSTITUIDAS: ${{ inputs.substituidas }}
+          AUTORIZACAO: ${{ inputs.autorizacao }}
+        run: node operacao/prova.mjs preparar --estado saida/prova-estado.json --anteriores anteriores --substituidas "$SUBSTITUIDAS" --registro operacao-registro.json --autorizacao "$AUTORIZACAO"
+      - name: Guardar o estado 08 antes de transmitir
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: prova-estado-08
+          path: saida/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Transmitir 08 (sem chave)
+        env:
+          DELIVERPROOF_TESTNET_AUTHORIZED: 'yes'
+        run: node operacao/prova.mjs transmitir --estado saida/prova-estado.json
+      - name: Preparar 09 (reconcilia, ações sem transação, reserva a próxima)
+        env:
+          DELIVERPROOF_TESTNET_AUTHORIZED: 'yes'
+          DELIVERPROOF_TESTNET_PRIVATE_KEY: ${{ secrets.DELIVERPROOF_TESTNET_PRIVATE_KEY }}
+          DELIVERPROOF_FORNECEDOR_PRIVATE_KEY: ${{ secrets.DELIVERPROOF_FORNECEDOR_PRIVATE_KEY }}
+          FILEBASE_TOKEN: ${{ secrets.FILEBASE_TOKEN }}
+          SUBSTITUIDAS: ${{ inputs.substituidas }}
+          AUTORIZACAO: ${{ inputs.autorizacao }}
+        run: node operacao/prova.mjs preparar --estado saida/prova-estado.json --anteriores anteriores --substituidas "$SUBSTITUIDAS" --registro operacao-registro.json --autorizacao "$AUTORIZACAO"
+      - name: Guardar o estado 09 antes de transmitir
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: prova-estado-09
+          path: saida/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Transmitir 09 (sem chave)
+        env:
+          DELIVERPROOF_TESTNET_AUTHORIZED: 'yes'
+        run: node operacao/prova.mjs transmitir --estado saida/prova-estado.json
+      - name: Preparar 10 (reconcilia, ações sem transação, reserva a próxima)
+        env:
+          DELIVERPROOF_TESTNET_AUTHORIZED: 'yes'
+          DELIVERPROOF_TESTNET_PRIVATE_KEY: ${{ secrets.DELIVERPROOF_TESTNET_PRIVATE_KEY }}
+          DELIVERPROOF_FORNECEDOR_PRIVATE_KEY: ${{ secrets.DELIVERPROOF_FORNECEDOR_PRIVATE_KEY }}
+          FILEBASE_TOKEN: ${{ secrets.FILEBASE_TOKEN }}
+          SUBSTITUIDAS: ${{ inputs.substituidas }}
+          AUTORIZACAO: ${{ inputs.autorizacao }}
+        run: node operacao/prova.mjs preparar --estado saida/prova-estado.json --anteriores anteriores --substituidas "$SUBSTITUIDAS" --registro operacao-registro.json --autorizacao "$AUTORIZACAO"
+      - name: Guardar o estado 10 antes de transmitir
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: prova-estado-10
+          path: saida/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Transmitir 10 (sem chave)
+        env:
+          DELIVERPROOF_TESTNET_AUTHORIZED: 'yes'
+        run: node operacao/prova.mjs transmitir --estado saida/prova-estado.json
+      - name: Preparar final (marca a prova como concluída)
+        env:
+          DELIVERPROOF_TESTNET_AUTHORIZED: 'yes'
+          DELIVERPROOF_TESTNET_PRIVATE_KEY: ${{ secrets.DELIVERPROOF_TESTNET_PRIVATE_KEY }}
+          DELIVERPROOF_FORNECEDOR_PRIVATE_KEY: ${{ secrets.DELIVERPROOF_FORNECEDOR_PRIVATE_KEY }}
+          FILEBASE_TOKEN: ${{ secrets.FILEBASE_TOKEN }}
+          SUBSTITUIDAS: ${{ inputs.substituidas }}
+          AUTORIZACAO: ${{ inputs.autorizacao }}
+        run: node operacao/prova.mjs preparar --estado saida/prova-estado.json --anteriores anteriores --substituidas "$SUBSTITUIDAS" --registro operacao-registro.json --autorizacao "$AUTORIZACAO"
+      - name: Guardar o estado final
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: prova-estado-99
+          path: saida/
+          if-no-files-found: ignore
+          retention-days: 90

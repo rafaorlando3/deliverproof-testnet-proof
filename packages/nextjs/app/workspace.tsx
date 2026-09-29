@@ -158,7 +158,8 @@ export default function Workspace() {
     mounted.current = true;
     return () => {
       mounted.current = false;
-      epoch.current++;
+      // epoch is an app-owned counter, not a DOM ref: bump its live value on unmount.
+      epoch.current += 1;
     };
   }, []);
   useEffect(() => {

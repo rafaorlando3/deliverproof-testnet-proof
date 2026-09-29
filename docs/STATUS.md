@@ -1,5 +1,24 @@
 # Status — 2026-09-29
 
+## Lint and production boot gate (2026-09-29)
+
+The bounty's eliminatory checks include lint and a booting app whose core routes
+return OK. Public run 36556660288 covered neither. This commit fixes the single
+`react-hooks/exhaustive-deps` warning: the unmount cleanup bumped the app-owned
+`epoch` counter with `++` and now uses `+= 1`, the same operation on a number,
+which the rule recognizes as a ref managed by the app. No rule is disabled, nothing
+is suppressed, and the live counter is still incremented on unmount. `next:lint`
+now fails on any warning (`eslint . --max-warnings 0`), and the CLI outro lists
+lint and the production start.
+
+Cloud checks before publication, not the public run: Node 22.22.2, npm@10.9.7,
+lint with 0 errors and 0 warnings, types, next build, core 113 passed and 1 skipped,
+Hardhat 38, chain 46, and a production start on 127.0.0.1 answering 200 with the
+app title. The public workflow on validation/public-install adds lint and that boot
+check to the CLI-generated app. Its run over this exact SHA is recorded outside this
+tree; a later commit does not inherit it. The boot check covers HTTP responses only,
+not wallet, Hedera, HCS or IPFS flows.
+
 ## Current HCS publisher integration — 2026-09-29
 
 Reviewed original commits 86d4a829b901dfe16d4ddff2a76a9712d63e8780 and

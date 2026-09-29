@@ -25,7 +25,9 @@
             { "label": "Check core types", "command": "{run:check}" },
             { "label": "Test the core and contract separately", "command": "{run:core:test}" },
             { "command": "{run:hardhat:test}" },
-            { "label": "Review the frontend", "command": "{run:next:build}" },
+            { "label": "Review the frontend", "command": "{run:next:lint}" },
+            { "command": "{run:next:build}" },
+            { "label": "Serve it on 127.0.0.1", "command": "{run:next:start}" },
             {
               "text": "The UI starts without a deployment. Configure only an independently verified manifest before using a wallet. Never target mainnet or put a secret in a file."
             }

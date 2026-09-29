@@ -179,8 +179,9 @@ and 24 were not rerun for HCS. The public CLI installation of 02dd518 independen
 counts on Node 22.22.2; it did not repeat lint or the formatter. The subsequent
 documentation update changes no executable file, test, configuration or lockfile;
 its new Markdown bytes were not regenerated through the CLI. See [STATUS](docs/STATUS.md) for the evidence boundaries.
-`npm run next:lint`, `npm run next:check` before and after `npm run next:build`,
-and `npm run format:check` complete the checks. One known lint warning remains.
+`npm run next:lint` (zero warnings allowed), `npm run next:check` before and after `npm run next:build`,
+and `npm run format:check` complete the checks. The former cleanup-ref lint warning is fixed in source.
+The public workflow adds lint and a production boot check on 127.0.0.1 for this commit; its result is recorded outside this tree.
 Formatting excludes Markdown and evidence artifacts.
 
 ## Limits
